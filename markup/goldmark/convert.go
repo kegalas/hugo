@@ -34,6 +34,8 @@ import (
 	"github.com/yuin/goldmark/renderer"
 	"github.com/yuin/goldmark/renderer/html"
 	"github.com/yuin/goldmark/text"
+	
+	"github.com/litao91/goldmark-mathjax"
 )
 
 const (
@@ -100,6 +102,7 @@ func newMarkdown(pcfg converter.ProviderConfig) goldmark.Markdown {
 	)
 
 	extensions = append(extensions, images.New(cfg.Parser.WrapStandAloneImageWithinParagraph))
+	extensions = append(extensions, mathjax.MathJax)
 
 	if mcfg.Highlight.CodeFences {
 		extensions = append(extensions, codeblocks.New())
