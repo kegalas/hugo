@@ -40,6 +40,8 @@ import (
 
 	"github.com/gohugoio/hugo/markup/converter"
 	"github.com/gohugoio/hugo/markup/tableofcontents"
+	
+	"github.com/litao91/goldmark-mathjax"
 )
 
 const (
@@ -116,6 +118,8 @@ func newMarkdown(pcfg converter.ProviderConfig) goldmark.Markdown {
 	)
 
 	extensions = append(extensions, images.New(cfg.Parser.WrapStandAloneImageWithinParagraph))
+	
+	extensions = append(extensions, mathjax.MathJax)
 
 	extensions = append(extensions, extras.New(
 		extras.Config{
