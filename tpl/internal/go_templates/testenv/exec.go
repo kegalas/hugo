@@ -6,6 +6,7 @@ package testenv
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -30,20 +31,17 @@ import (
 // If exec is not supported, testenv.SyscallIsNotSupported will return true
 // for the resulting error.
 func MustHaveExec(t testing.TB) {
-	tryExecOnce.Do(func() {
-		tryExecErr = tryExec()
-	})
-	if tryExecErr != nil {
-		t.Skipf("skipping test: cannot exec subprocess on %s/%s: %v", runtime.GOOS, runtime.GOARCH, tryExecErr)
+	if err := tryExec(); err != nil {
+		msg := fmt.Sprintf("cannot exec subprocess on %s/%s: %v", runtime.GOOS, runtime.GOARCH, err)
+		if t == nil {
+			panic(msg)
+		}
+		t.Helper()
+		t.Skip("skipping test:", msg)
 	}
 }
 
-var (
-	tryExecOnce sync.Once
-	tryExecErr  error
-)
-
-func tryExec() error {
+var tryExec = sync.OnceValue(func() error {
 	switch runtime.GOOS {
 	case "wasip1", "js", "ios":
 	default:
@@ -60,23 +58,45 @@ func tryExec() error {
 	// may as well use the same path so that this branch can be tested without
 	// an ios environment.
 
-	/*if !testing.Testing() {
+	if !testing.Testing() {
 		// This isn't a standard 'go test' binary, so we don't know how to
 		// self-exec in a way that should succeed without side effects.
 		// Just forget it.
 		return errors.New("can't probe for exec support with a non-test executable")
-	}*/
+	}
 
 	// We know that this is a test executable. We should be able to run it with a
 	// no-op flag to check for overall exec support.
-	exe, err := os.Executable()
+	exe, err := exePath()
 	if err != nil {
 		return fmt.Errorf("can't probe for exec support: %w", err)
 	}
 	cmd := exec.Command(exe, "-test.list=^$")
 	cmd.Env = origEnv
 	return cmd.Run()
+})
+
+// Executable is a wrapper around [MustHaveExec] and [os.Executable].
+// It returns the path name for the executable that started the current process,
+// or skips the test if the current system can't start new processes,
+// or fails the test if the path can not be obtained.
+func Executable(t testing.TB) string {
+	MustHaveExec(t)
+
+	exe, err := exePath()
+	if err != nil {
+		msg := fmt.Sprintf("os.Executable error: %v", err)
+		if t == nil {
+			panic(msg)
+		}
+		t.Fatal(msg)
+	}
+	return exe
 }
+
+var exePath = sync.OnceValues(func() (string, error) {
+	return os.Executable()
+})
 
 var execPaths sync.Map // path -> error
 
@@ -92,6 +112,7 @@ func MustHaveExecPath(t testing.TB, path string) {
 		err, _ = execPaths.LoadOrStore(path, err)
 	}
 	if err != nil {
+		t.Helper()
 		t.Skipf("skipping test: %s: %s", path, err)
 	}
 }
@@ -99,11 +120,14 @@ func MustHaveExecPath(t testing.TB, path string) {
 // CleanCmdEnv will fill cmd.Env with the environment, excluding certain
 // variables that could modify the behavior of the Go tools such as
 // GODEBUG and GOTRACEBACK.
+//
+// If the caller wants to set cmd.Dir, set it before calling this function,
+// so PWD will be set correctly in the environment.
 func CleanCmdEnv(cmd *exec.Cmd) *exec.Cmd {
 	if cmd.Env != nil {
 		panic("environment already set")
 	}
-	for _, env := range os.Environ() {
+	for _, env := range cmd.Environ() {
 		// Exclude GODEBUG from the environment to prevent its output
 		// from breaking tests that are trying to parse other command output.
 		if strings.HasPrefix(env, "GODEBUG=") {

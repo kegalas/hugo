@@ -115,10 +115,10 @@ func TestFromTypeString(t *testing.T) {
 
 func TestFromStringAndExt(t *testing.T) {
 	c := qt.New(t)
-	f, err := FromStringAndExt("text/html", "html")
+	f, err := FromStringAndExt("text/html", "html", "htm")
 	c.Assert(err, qt.IsNil)
 	c.Assert(f, qt.Equals, Builtin.HTMLType)
-	f, err = FromStringAndExt("text/html", ".html")
+	f, err = FromStringAndExt("text/html", ".html", ".htm")
 	c.Assert(err, qt.IsNil)
 	c.Assert(f, qt.Equals, Builtin.HTMLType)
 }

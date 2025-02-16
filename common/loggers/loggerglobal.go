@@ -1,4 +1,4 @@
-// Copyright 2023 The Hugo Authors. All rights reserved.
+// Copyright 2024 The Hugo Authors. All rights reserved.
 // Some functions in this file (see comments) is based on the Go source code,
 // copyright The Go Authors and  governed by a BSD-style license.
 //
@@ -21,7 +21,15 @@ import (
 	"github.com/bep/logg"
 )
 
-func InitGlobalLogger(panicOnWarnings bool) {
+// SetGlobalLogger sets the global logger.
+// This is used in a few places in Hugo, e.g. deprecated functions.
+func SetGlobalLogger(logger Logger) {
+	logMu.Lock()
+	defer logMu.Unlock()
+	log = logger
+}
+
+func initGlobalLogger(level logg.Level, panicOnWarnings bool) {
 	logMu.Lock()
 	defer logMu.Unlock()
 	var logHookLast func(e *logg.Entry) error
@@ -31,8 +39,9 @@ func InitGlobalLogger(panicOnWarnings bool) {
 
 	log = New(
 		Options{
-			Distinct:    true,
-			HandlerPost: logHookLast,
+			Level:         level,
+			DistinctLevel: logg.LevelInfo,
+			HandlerPost:   logHookLast,
 		},
 	)
 }
@@ -49,5 +58,5 @@ func Log() Logger {
 var log Logger
 
 func init() {
-	InitGlobalLogger(false)
+	initGlobalLogger(logg.LevelWarn, false)
 }

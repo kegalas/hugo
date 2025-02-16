@@ -16,7 +16,8 @@ import (
 )
 
 func main() {
-	// The current is built with c19c4c566c HEAD, tag: go1.21.0.
+	// The current is built with 3901409b5d [release-branch.go1.24] go1.24.0
+	// TODO(bep) preserve the staticcheck.conf file.
 	fmt.Println("Forking ...")
 	defer fmt.Println("Done ...")
 
@@ -162,11 +163,15 @@ func copyGoPackage(dst, src string) {
 
 func doWithGoFiles(dir string,
 	rewrite func(name string),
-	transform func(name, in string) string) {
+	transform func(name, in string) string,
+) {
 	if rewrite == nil && transform == nil {
 		return
 	}
 	must(filepath.Walk(filepath.Join(forkRoot, dir), func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
 		if info.IsDir() {
 			return nil
 		}
@@ -211,6 +216,7 @@ func rewrite(filename, rule string) {
 }
 
 func goimports(dir string) {
+	// Needs go install golang.org/x/tools/cmd/goimports@latest
 	cmf, _ := hexec.SafeCommand("goimports", "-w", dir)
 	out, err := cmf.CombinedOutput()
 	if err != nil {

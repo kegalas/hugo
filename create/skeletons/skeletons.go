@@ -1,4 +1,4 @@
-// Copyright 2023 The Hugo Authors. All rights reserved.
+// Copyright 2024 The Hugo Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -76,6 +76,11 @@ func CreateSite(createpath string, sourceFs afero.Fs, force bool, format string)
 		return err
 	}
 
+	err = newSiteCreateArchetype(sourceFs, createpath, format)
+	if err != nil {
+		return err
+	}
+
 	return copyFiles(createpath, sourceFs, siteFs)
 }
 
@@ -83,7 +88,7 @@ func copyFiles(createpath string, sourceFs afero.Fs, skeleton embed.FS) error {
 	return fs.WalkDir(skeleton, ".", func(path string, d fs.DirEntry, err error) error {
 		_, slug, _ := strings.Cut(path, "/")
 		if d.IsDir() {
-			return sourceFs.MkdirAll(filepath.Join(createpath, slug), 0777)
+			return sourceFs.MkdirAll(filepath.Join(createpath, slug), 0o777)
 		} else {
 			if filepath.Base(path) != ".gitkeep" {
 				data, _ := fs.ReadFile(skeleton, path)
@@ -108,4 +113,20 @@ func newSiteCreateConfig(fs afero.Fs, createpath string, format string) (err err
 	}
 
 	return helpers.WriteToDisk(filepath.Join(createpath, "hugo."+format), &buf, fs)
+}
+
+func newSiteCreateArchetype(fs afero.Fs, createpath string, format string) (err error) {
+	in := map[string]any{
+		"title": "{{ replace .File.ContentBaseName \"-\" \" \" | title }}",
+		"date":  "{{ .Date }}",
+		"draft": true,
+	}
+
+	var buf bytes.Buffer
+	err = parser.InterfaceToFrontMatter(in, metadecoders.FormatFromString(format), &buf)
+	if err != nil {
+		return err
+	}
+
+	return helpers.WriteToDisk(filepath.Join(createpath, "archetypes", "default.md"), &buf, fs)
 }
